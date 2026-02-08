@@ -5,6 +5,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "scan": "bun run scripts/marketing/nostr-mention-scanner.ts",
+    "validate-relays": "bun run scripts/marketing/validate-relays.ts",
     "test": "bun test"
   },
   "devDependencies": {
