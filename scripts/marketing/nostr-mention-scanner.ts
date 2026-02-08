@@ -71,7 +71,7 @@ function convertBits(
   return ret;
 }
 
-function npubToHex(npub: string): string {
+export function npubToHex(npub: string): string {
   const { prefix, words } = bech32Decode(npub);
   if (prefix !== "npub") throw new Error(`Expected npub prefix, got: ${prefix}`);
   const bytes = convertBits(words, 5, 8, false);
@@ -82,16 +82,16 @@ function npubToHex(npub: string): string {
 // Configuration
 // ---------------------------------------------------------------------------
 
-const NOSTRIA_NPUB =
+export const NOSTRIA_NPUB =
   "npub16x7nxvehx0wvgy0sa6ynkw9c2ghuph3z0ll5t8veq3xwm8n9tqds6ka44x";
-const NOSTRIA_HEX = npubToHex(NOSTRIA_NPUB);
+export const NOSTRIA_HEX = npubToHex(NOSTRIA_NPUB);
 
 interface RelayConfig {
   relays: string[];
   timeout_ms: number;
 }
 
-interface NostrEvent {
+export interface NostrEvent {
   id: string;
   pubkey: string;
   created_at: number;
@@ -101,7 +101,7 @@ interface NostrEvent {
   sig: string;
 }
 
-interface ScanResult {
+export interface ScanResult {
   event: NostrEvent;
   relay: string;
   match_type: ("t-tag" | "p-tag" | "content")[];
@@ -225,10 +225,36 @@ function queryRelay(
 }
 
 // ---------------------------------------------------------------------------
+// Filter construction
+// ---------------------------------------------------------------------------
+
+/**
+ * Build NIP-01 REQ filters for scanning Nostria mentions.
+ *
+ * Filter 1: Events with t-tag matching "nostria" (includes common case variants
+ *           since NIP-01 tag matching is case-sensitive on the relay side).
+ * Filter 2: Events with p-tag pointing to Nostria's pubkey.
+ *
+ * Client-side classification (classifyEvent) performs full case-insensitive
+ * matching as a second pass, so any events that slip through with unusual
+ * casing will still be correctly classified.
+ */
+export function buildScanFilters(
+  sinceTimestamp: number,
+  limit: number,
+  nostriaHex: string
+): Record<string, unknown>[] {
+  return [
+    { "#t": ["nostria", "Nostria", "NOSTRIA"], since: sinceTimestamp, limit },
+    { "#p": [nostriaHex], since: sinceTimestamp, limit },
+  ];
+}
+
+// ---------------------------------------------------------------------------
 // Event classification
 // ---------------------------------------------------------------------------
 
-function classifyEvent(event: NostrEvent): ("t-tag" | "p-tag" | "content")[] {
+export function classifyEvent(event: NostrEvent): ("t-tag" | "p-tag" | "content")[] {
   const matches: ("t-tag" | "p-tag" | "content")[] = [];
 
   for (const tag of event.tags) {
@@ -385,13 +411,8 @@ async function main() {
 
   const sinceTimestamp = Math.floor(Date.now() / 1000) - sinceDays * 86400;
 
-  // Build filters:
-  // Filter 1: Events with t-tag "nostria" (hashtag)
-  // Filter 2: Events with p-tag pointing to Nostria's pubkey
-  const filters = [
-    { "#t": ["nostria", "Nostria"], since: sinceTimestamp, limit },
-    { "#p": [NOSTRIA_HEX], since: sinceTimestamp, limit },
-  ];
+  // Build filters using the shared helper
+  const filters = buildScanFilters(sinceTimestamp, limit, NOSTRIA_HEX);
 
   // Query all relays concurrently
   const allResults: ScanResult[] = [];
@@ -503,7 +524,10 @@ async function main() {
   console.log(`Report:  ${mdFilename}`);
 }
 
-main().catch((err) => {
-  console.error("Fatal error:", err);
-  process.exit(1);
-});
+// Only run main() when executed directly (not when imported by tests)
+if (import.meta.path === Bun.main) {
+  main().catch((err) => {
+    console.error("Fatal error:", err);
+    process.exit(1);
+  });
+}
