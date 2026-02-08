@@ -101,10 +101,17 @@ export interface NostrEvent {
   sig: string;
 }
 
+export interface ReferencedEvent {
+  eventId: string;
+  relayUrl: string;
+  marker: "root" | "reply" | "mention" | "";
+}
+
 export interface ScanResult {
   event: NostrEvent;
   relay: string;
   match_type: ("t-tag" | "p-tag" | "content")[];
+  referenced_events: ReferencedEvent[];
 }
 
 // ---------------------------------------------------------------------------
@@ -279,6 +286,45 @@ export function classifyEvent(event: NostrEvent): ("t-tag" | "p-tag" | "content"
 }
 
 // ---------------------------------------------------------------------------
+// E-tag extraction for threading context (NIP-10)
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract referenced event IDs (e-tags) from a Nostr event for threading context.
+ *
+ * Supports NIP-10 marker-based format:
+ *   ["e", "<event-id>", "<relay-url>", "<marker>"]
+ * where marker is "root", "reply", or "mention".
+ *
+ * Also handles the legacy positional format (no marker) and tags with
+ * only an event ID.
+ */
+export function extractReferencedEvents(event: NostrEvent): ReferencedEvent[] {
+  const results: ReferencedEvent[] = [];
+
+  for (const tag of event.tags) {
+    if (tag[0] !== "e" || !tag[1]) continue;
+
+    const eventId = tag[1];
+
+    // Validate: event IDs should be 64-char hex strings
+    if (!/^[0-9a-f]{64}$/i.test(eventId)) continue;
+
+    const relayUrl = tag[2] || "";
+    const rawMarker = (tag[3] || "").toLowerCase();
+
+    let marker: ReferencedEvent["marker"] = "";
+    if (rawMarker === "root" || rawMarker === "reply" || rawMarker === "mention") {
+      marker = rawMarker;
+    }
+
+    results.push({ eventId, relayUrl, marker });
+  }
+
+  return results;
+}
+
+// ---------------------------------------------------------------------------
 // Output generation
 // ---------------------------------------------------------------------------
 
@@ -350,6 +396,36 @@ function generateMarkdownReport(results: ScanResult[], sinceDays: number): strin
   md += `| t-tag (hashtag #nostria) | ${matchTypeCounts["t-tag"]} |\n`;
   md += `| p-tag (Nostria account tagged) | ${matchTypeCounts["p-tag"]} |\n`;
   md += `| Content mention | ${matchTypeCounts["content"]} |\n\n`;
+
+  // Threading context stats
+  let totalRefs = 0;
+  let rootCount = 0;
+  let replyCount = 0;
+  let mentionCount = 0;
+  let unmarkedCount = 0;
+  const eventsWithRefs = sorted.filter((r) => r.referenced_events.length > 0).length;
+
+  for (const r of sorted) {
+    for (const ref of r.referenced_events) {
+      totalRefs++;
+      if (ref.marker === "root") rootCount++;
+      else if (ref.marker === "reply") replyCount++;
+      else if (ref.marker === "mention") mentionCount++;
+      else unmarkedCount++;
+    }
+  }
+
+  if (totalRefs > 0) {
+    md += `## Threading Context\n\n`;
+    md += `**Events with references:** ${eventsWithRefs} of ${sorted.length}\n`;
+    md += `**Total e-tag references:** ${totalRefs}\n\n`;
+    md += `| Marker | Count |\n`;
+    md += `|--------|-------|\n`;
+    md += `| root | ${rootCount} |\n`;
+    md += `| reply | ${replyCount} |\n`;
+    md += `| mention | ${mentionCount} |\n`;
+    md += `| (unmarked) | ${unmarkedCount} |\n\n`;
+  }
 
   md += `## Event Kinds\n\n`;
   md += `| Kind | Label | Count |\n`;
@@ -437,7 +513,8 @@ async function main() {
 
         if (!seenIds.has(event.id)) {
           seenIds.add(event.id);
-          allResults.push({ event, relay: relayUrl, match_type: matchTypes });
+          const referencedEvents = extractReferencedEvents(event);
+          allResults.push({ event, relay: relayUrl, match_type: matchTypes, referenced_events: referencedEvents });
           newCount++;
         }
       }
@@ -503,6 +580,7 @@ async function main() {
       sig: r.event.sig,
       source_relay: r.relay,
       match_type: r.match_type,
+      referenced_events: r.referenced_events,
     })),
   };
 

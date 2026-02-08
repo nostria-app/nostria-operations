@@ -3,9 +3,11 @@ import {
   classifyEvent,
   buildScanFilters,
   npubToHex,
+  extractReferencedEvents,
   NOSTRIA_HEX,
   NOSTRIA_NPUB,
   type NostrEvent,
+  type ReferencedEvent,
 } from "./nostr-mention-scanner";
 
 // ---------------------------------------------------------------------------
@@ -358,5 +360,247 @@ describe("NIP-01 #t filter — case coverage", () => {
       const result = classifyEvent(event);
       expect(result).toContain("t-tag");
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// extractReferencedEvents — e-tag extraction (NIP-10)
+// ---------------------------------------------------------------------------
+
+const VALID_EVENT_ID =
+  "a".repeat(64);
+const VALID_EVENT_ID_2 =
+  "b".repeat(64);
+const VALID_EVENT_ID_3 =
+  "c".repeat(64);
+
+describe("extractReferencedEvents — basic extraction", () => {
+  test("extracts a single e-tag with no relay or marker", () => {
+    const event = makeEvent({ tags: [["e", VALID_EVENT_ID]] });
+    const result = extractReferencedEvents(event);
+    expect(result).toHaveLength(1);
+    expect(result[0].eventId).toBe(VALID_EVENT_ID);
+    expect(result[0].relayUrl).toBe("");
+    expect(result[0].marker).toBe("");
+  });
+
+  test("extracts e-tag with relay URL but no marker", () => {
+    const event = makeEvent({
+      tags: [["e", VALID_EVENT_ID, "wss://relay.example.com"]],
+    });
+    const result = extractReferencedEvents(event);
+    expect(result).toHaveLength(1);
+    expect(result[0].eventId).toBe(VALID_EVENT_ID);
+    expect(result[0].relayUrl).toBe("wss://relay.example.com");
+    expect(result[0].marker).toBe("");
+  });
+
+  test("extracts e-tag with relay URL and root marker", () => {
+    const event = makeEvent({
+      tags: [["e", VALID_EVENT_ID, "wss://relay.example.com", "root"]],
+    });
+    const result = extractReferencedEvents(event);
+    expect(result).toHaveLength(1);
+    expect(result[0].marker).toBe("root");
+  });
+
+  test("extracts e-tag with reply marker", () => {
+    const event = makeEvent({
+      tags: [["e", VALID_EVENT_ID, "wss://relay.example.com", "reply"]],
+    });
+    const result = extractReferencedEvents(event);
+    expect(result).toHaveLength(1);
+    expect(result[0].marker).toBe("reply");
+  });
+
+  test("extracts e-tag with mention marker", () => {
+    const event = makeEvent({
+      tags: [["e", VALID_EVENT_ID, "wss://relay.example.com", "mention"]],
+    });
+    const result = extractReferencedEvents(event);
+    expect(result).toHaveLength(1);
+    expect(result[0].marker).toBe("mention");
+  });
+
+  test("extracts multiple e-tags", () => {
+    const event = makeEvent({
+      tags: [
+        ["e", VALID_EVENT_ID, "wss://relay.example.com", "root"],
+        ["e", VALID_EVENT_ID_2, "wss://relay.example.com", "reply"],
+        ["e", VALID_EVENT_ID_3, "", "mention"],
+      ],
+    });
+    const result = extractReferencedEvents(event);
+    expect(result).toHaveLength(3);
+    expect(result[0].marker).toBe("root");
+    expect(result[1].marker).toBe("reply");
+    expect(result[2].marker).toBe("mention");
+  });
+
+  test("returns empty array when no e-tags present", () => {
+    const event = makeEvent({
+      tags: [
+        ["t", "nostria"],
+        ["p", "somepubkey"],
+      ],
+    });
+    const result = extractReferencedEvents(event);
+    expect(result).toHaveLength(0);
+  });
+
+  test("returns empty array for empty tags", () => {
+    const event = makeEvent({ tags: [] });
+    const result = extractReferencedEvents(event);
+    expect(result).toHaveLength(0);
+  });
+});
+
+describe("extractReferencedEvents — marker case handling", () => {
+  test("handles uppercase marker", () => {
+    const event = makeEvent({
+      tags: [["e", VALID_EVENT_ID, "", "ROOT"]],
+    });
+    const result = extractReferencedEvents(event);
+    expect(result).toHaveLength(1);
+    expect(result[0].marker).toBe("root");
+  });
+
+  test("handles mixed-case marker", () => {
+    const event = makeEvent({
+      tags: [["e", VALID_EVENT_ID, "", "Reply"]],
+    });
+    const result = extractReferencedEvents(event);
+    expect(result).toHaveLength(1);
+    expect(result[0].marker).toBe("reply");
+  });
+
+  test("treats unknown marker as empty string", () => {
+    const event = makeEvent({
+      tags: [["e", VALID_EVENT_ID, "", "unknown"]],
+    });
+    const result = extractReferencedEvents(event);
+    expect(result).toHaveLength(1);
+    expect(result[0].marker).toBe("");
+  });
+});
+
+describe("extractReferencedEvents — validation", () => {
+  test("skips e-tag with missing event ID", () => {
+    const event = makeEvent({ tags: [["e"]] });
+    const result = extractReferencedEvents(event);
+    expect(result).toHaveLength(0);
+  });
+
+  test("skips e-tag with empty event ID", () => {
+    const event = makeEvent({ tags: [["e", ""]] });
+    const result = extractReferencedEvents(event);
+    expect(result).toHaveLength(0);
+  });
+
+  test("skips e-tag with invalid (non-hex) event ID", () => {
+    const event = makeEvent({ tags: [["e", "not-a-valid-hex-id"]] });
+    const result = extractReferencedEvents(event);
+    expect(result).toHaveLength(0);
+  });
+
+  test("skips e-tag with too-short hex event ID", () => {
+    const event = makeEvent({ tags: [["e", "abcdef1234"]] });
+    const result = extractReferencedEvents(event);
+    expect(result).toHaveLength(0);
+  });
+
+  test("skips e-tag with too-long hex event ID", () => {
+    const event = makeEvent({ tags: [["e", "a".repeat(65)]] });
+    const result = extractReferencedEvents(event);
+    expect(result).toHaveLength(0);
+  });
+
+  test("accepts uppercase hex event ID", () => {
+    const uppercaseId = "A".repeat(64);
+    const event = makeEvent({ tags: [["e", uppercaseId]] });
+    const result = extractReferencedEvents(event);
+    expect(result).toHaveLength(1);
+    expect(result[0].eventId).toBe(uppercaseId);
+  });
+
+  test("ignores non-e tags", () => {
+    const event = makeEvent({
+      tags: [
+        ["p", VALID_EVENT_ID],
+        ["t", "nostria"],
+        ["r", "https://example.com"],
+      ],
+    });
+    const result = extractReferencedEvents(event);
+    expect(result).toHaveLength(0);
+  });
+});
+
+describe("extractReferencedEvents — mixed tags", () => {
+  test("extracts e-tags while ignoring other tag types", () => {
+    const event = makeEvent({
+      tags: [
+        ["e", VALID_EVENT_ID, "wss://relay.example.com", "root"],
+        ["p", "somepubkey"],
+        ["t", "nostria"],
+        ["e", VALID_EVENT_ID_2, "", "reply"],
+        ["r", "https://example.com"],
+      ],
+    });
+    const result = extractReferencedEvents(event);
+    expect(result).toHaveLength(2);
+    expect(result[0].eventId).toBe(VALID_EVENT_ID);
+    expect(result[0].marker).toBe("root");
+    expect(result[1].eventId).toBe(VALID_EVENT_ID_2);
+    expect(result[1].marker).toBe("reply");
+  });
+
+  test("extracts valid e-tags and skips invalid ones", () => {
+    const event = makeEvent({
+      tags: [
+        ["e", VALID_EVENT_ID, "", "root"],
+        ["e", "invalid-id"],
+        ["e", VALID_EVENT_ID_2, "", "reply"],
+        ["e", ""],
+      ],
+    });
+    const result = extractReferencedEvents(event);
+    expect(result).toHaveLength(2);
+    expect(result[0].eventId).toBe(VALID_EVENT_ID);
+    expect(result[1].eventId).toBe(VALID_EVENT_ID_2);
+  });
+
+  test("handles typical threaded reply event", () => {
+    // A typical reply in NIP-10 has a root e-tag and a reply e-tag
+    const event = makeEvent({
+      tags: [
+        ["e", VALID_EVENT_ID, "wss://relay.damus.io", "root"],
+        ["e", VALID_EVENT_ID_2, "wss://nos.lol", "reply"],
+        ["p", "somepubkey"],
+        ["t", "nostria"],
+      ],
+      content: "I love Nostria!",
+    });
+    const result = extractReferencedEvents(event);
+    expect(result).toHaveLength(2);
+
+    const root = result.find((r) => r.marker === "root");
+    const reply = result.find((r) => r.marker === "reply");
+    expect(root).toBeDefined();
+    expect(root!.eventId).toBe(VALID_EVENT_ID);
+    expect(root!.relayUrl).toBe("wss://relay.damus.io");
+    expect(reply).toBeDefined();
+    expect(reply!.eventId).toBe(VALID_EVENT_ID_2);
+    expect(reply!.relayUrl).toBe("wss://nos.lol");
+  });
+
+  test("handles empty relay URL with marker", () => {
+    const event = makeEvent({
+      tags: [["e", VALID_EVENT_ID, "", "root"]],
+    });
+    const result = extractReferencedEvents(event);
+    expect(result).toHaveLength(1);
+    expect(result[0].relayUrl).toBe("");
+    expect(result[0].marker).toBe("root");
   });
 });
