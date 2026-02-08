@@ -19,6 +19,7 @@
 
 import { resolve, dirname } from "path";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { NoticeCollector, handleNotice } from "./relay-notice";
 
 // ---------------------------------------------------------------------------
 // Nostr npub -> hex conversion (bech32 decode)
@@ -139,7 +140,8 @@ function parseArgs() {
 function queryRelay(
   relayUrl: string,
   filters: Record<string, unknown>[],
-  timeoutMs: number
+  timeoutMs: number,
+  noticeCollector?: NoticeCollector
 ): Promise<NostrEvent[]> {
   return new Promise((resolvePromise) => {
     const events: NostrEvent[] = [];
@@ -183,6 +185,10 @@ function queryRelay(
               : msgEvent.data.toString()
           );
           if (Array.isArray(data)) {
+            // Log NOTICE messages for debugging
+            if (noticeCollector) {
+              handleNotice(data, relayUrl, noticeCollector);
+            }
             if (data[0] === "EVENT" && data[2]) {
               events.push(data[2] as NostrEvent);
             } else if (data[0] === "EOSE") {
@@ -394,11 +400,13 @@ async function main() {
 
   console.log("Connecting to relays...\n");
 
+  const noticeCollector = new NoticeCollector();
+
   const relayPromises = relayConfig.relays.map(async (relayUrl) => {
     const startTime = Date.now();
     try {
       console.log(`  -> ${relayUrl} ...`);
-      const events = await queryRelay(relayUrl, filters, relayConfig.timeout_ms);
+      const events = await queryRelay(relayUrl, filters, relayConfig.timeout_ms, noticeCollector);
       const elapsed = Date.now() - startTime;
 
       let newCount = 0;
@@ -430,6 +438,14 @@ async function main() {
   console.log(
     `Relays contacted: ${relayStats.length} (${relayStats.filter((r) => !r.error).length} successful)\n`
   );
+
+  if (noticeCollector.count > 0) {
+    console.log(`Relay NOTICE messages (${noticeCollector.count}):`);
+    for (const n of noticeCollector.getAll()) {
+      console.log(`  [${n.relay}] ${n.message}`);
+    }
+    console.log("");
+  }
 
   if (allResults.length === 0) {
     console.log("No events found. Nothing to save.");

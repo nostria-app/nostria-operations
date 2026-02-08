@@ -27,6 +27,7 @@ import {
   type RelayCheckResult,
   type ValidationReport,
 } from "./validate-relays";
+import { NoticeCollector } from "./relay-notice";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -49,8 +50,9 @@ export async function testRelayConnections(
 ): Promise<ConnectionTestReport> {
   const startTime = Date.now();
 
+  const noticeCollector = new NoticeCollector();
   const results = await Promise.all(
-    relays.map((url) => checkRelay(url, timeoutMs))
+    relays.map((url) => checkRelay(url, timeoutMs, undefined, undefined, noticeCollector))
   );
 
   const reachable = results.filter((r) => r.reachable).length;
@@ -62,6 +64,7 @@ export async function testRelayConnections(
     reachable,
     unreachable: relays.length - reachable,
     results,
+    notices: noticeCollector.getAll(),
     configPath,
     timeoutMs,
     durationMs,

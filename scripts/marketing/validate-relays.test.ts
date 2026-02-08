@@ -183,8 +183,10 @@ describe("validateRelays", () => {
     expect(report).toHaveProperty("reachable");
     expect(report).toHaveProperty("unreachable");
     expect(report).toHaveProperty("results");
+    expect(report).toHaveProperty("notices");
     expect(report.totalRelays).toBe(1);
     expect(report.results).toHaveLength(1);
+    expect(Array.isArray(report.notices)).toBe(true);
   }, 5000);
 
   test("counts reachable and unreachable correctly", async () => {

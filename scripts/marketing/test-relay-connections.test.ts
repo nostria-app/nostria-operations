@@ -28,6 +28,7 @@ function makeReport(overrides?: Partial<ConnectionTestReport>): ConnectionTestRe
       { url: "wss://relay.example.com", reachable: true, latencyMs: 42, error: null, retriesUsed: 0 },
       { url: "wss://bad.example.com", reachable: false, latencyMs: null, error: "Connection failed", retriesUsed: 2 },
     ],
+    notices: [],
     configPath: "/fake/relays.json",
     timeoutMs: 5000,
     durationMs: 1234,

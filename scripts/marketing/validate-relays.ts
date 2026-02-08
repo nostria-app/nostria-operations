@@ -19,6 +19,7 @@
 
 import { resolve, dirname } from "path";
 import { existsSync, readFileSync } from "fs";
+import { NoticeCollector, handleNotice } from "./relay-notice";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -51,6 +52,8 @@ export interface ValidationReport {
   reachable: number;
   unreachable: number;
   results: RelayCheckResult[];
+  /** NOTICE messages received from relays during validation. */
+  notices: import("./relay-notice").RelayNotice[];
 }
 
 // ---------------------------------------------------------------------------
@@ -93,7 +96,7 @@ export interface SingleCheckResult {
   error: string | null;
 }
 
-function checkRelaySingle(url: string, timeoutMs: number): Promise<SingleCheckResult> {
+function checkRelaySingle(url: string, timeoutMs: number, noticeCollector?: NoticeCollector): Promise<SingleCheckResult> {
   return new Promise((resolvePromise) => {
     const startTime = Date.now();
     let resolved = false;
@@ -145,6 +148,10 @@ function checkRelaySingle(url: string, timeoutMs: number): Promise<SingleCheckRe
               : msgEvent.data.toString()
           );
           if (Array.isArray(data) && typeof data[0] === "string") {
+            // Log NOTICE messages for debugging
+            if (noticeCollector) {
+              handleNotice(data, url, noticeCollector);
+            }
             clearTimeout(timer);
             try {
               ws.close();
@@ -223,7 +230,8 @@ export async function checkRelay(
   url: string,
   timeoutMs: number,
   maxRetries: number = MAX_RETRIES,
-  retryDelayMs: number = RETRY_DELAY_MS
+  retryDelayMs: number = RETRY_DELAY_MS,
+  noticeCollector?: NoticeCollector
 ): Promise<RelayCheckResult> {
   let lastResult: SingleCheckResult | null = null;
 
@@ -232,7 +240,7 @@ export async function checkRelay(
       await delay(retryDelayMs);
     }
 
-    lastResult = await checkRelaySingle(url, timeoutMs);
+    lastResult = await checkRelaySingle(url, timeoutMs, noticeCollector);
 
     if (lastResult.reachable || !isTransientError(lastResult)) {
       return { ...lastResult, retriesUsed: attempt };
@@ -251,8 +259,9 @@ export async function validateRelays(
   relays: string[],
   timeoutMs: number
 ): Promise<ValidationReport> {
+  const noticeCollector = new NoticeCollector();
   const results = await Promise.all(
-    relays.map((url) => checkRelay(url, timeoutMs))
+    relays.map((url) => checkRelay(url, timeoutMs, MAX_RETRIES, RETRY_DELAY_MS, noticeCollector))
   );
 
   const reachable = results.filter((r) => r.reachable).length;
@@ -263,6 +272,7 @@ export async function validateRelays(
     reachable,
     unreachable: relays.length - reachable,
     results,
+    notices: noticeCollector.getAll(),
   };
 }
 
@@ -292,6 +302,13 @@ function printReport(report: ValidationReport): void {
     );
   } else {
     console.log("All relays are reachable.");
+  }
+
+  if (report.notices.length > 0) {
+    console.log(`\nRelay NOTICE messages (${report.notices.length}):`);
+    for (const n of report.notices) {
+      console.log(`  [${n.relay}] ${n.message}`);
+    }
   }
 }
 
