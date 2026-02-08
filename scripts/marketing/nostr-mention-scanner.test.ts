@@ -4,10 +4,12 @@ import {
   buildScanFilters,
   npubToHex,
   extractReferencedEvents,
+  countUniqueAuthors,
   NOSTRIA_HEX,
   NOSTRIA_NPUB,
   type NostrEvent,
   type ReferencedEvent,
+  type ScanResult,
 } from "./nostr-mention-scanner";
 
 // ---------------------------------------------------------------------------
@@ -25,6 +27,16 @@ function makeEvent(overrides: Partial<NostrEvent> = {}): NostrEvent {
     content: "",
     sig: "sig000",
     ...overrides,
+  };
+}
+
+/** Create a minimal ScanResult for testing. */
+function makeScanResult(overrides: Partial<NostrEvent> = {}, relay = "wss://relay.example.com"): ScanResult {
+  return {
+    event: makeEvent(overrides),
+    relay,
+    match_type: ["t-tag"],
+    referenced_events: [],
   };
 }
 
@@ -602,5 +614,121 @@ describe("extractReferencedEvents — mixed tags", () => {
     expect(result).toHaveLength(1);
     expect(result[0].relayUrl).toBe("");
     expect(result[0].marker).toBe("root");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// countUniqueAuthors — community reach measurement
+// ---------------------------------------------------------------------------
+
+describe("countUniqueAuthors", () => {
+  test("returns zero for empty results", () => {
+    const result = countUniqueAuthors([]);
+    expect(result.count).toBe(0);
+    expect(result.pubkeys).toHaveLength(0);
+  });
+
+  test("counts a single author", () => {
+    const results = [makeScanResult({ pubkey: "aaa111" })];
+    const result = countUniqueAuthors(results);
+    expect(result.count).toBe(1);
+    expect(result.pubkeys).toEqual(["aaa111"]);
+  });
+
+  test("counts multiple unique authors", () => {
+    const results = [
+      makeScanResult({ pubkey: "author1" }),
+      makeScanResult({ pubkey: "author2" }),
+      makeScanResult({ pubkey: "author3" }),
+    ];
+    const result = countUniqueAuthors(results);
+    expect(result.count).toBe(3);
+    expect(result.pubkeys).toHaveLength(3);
+    expect(result.pubkeys).toContain("author1");
+    expect(result.pubkeys).toContain("author2");
+    expect(result.pubkeys).toContain("author3");
+  });
+
+  test("deduplicates repeated authors", () => {
+    const results = [
+      makeScanResult({ pubkey: "author1" }),
+      makeScanResult({ pubkey: "author1" }),
+      makeScanResult({ pubkey: "author2" }),
+      makeScanResult({ pubkey: "author1" }),
+      makeScanResult({ pubkey: "author2" }),
+    ];
+    const result = countUniqueAuthors(results);
+    expect(result.count).toBe(2);
+    expect(result.pubkeys).toHaveLength(2);
+    expect(result.pubkeys).toContain("author1");
+    expect(result.pubkeys).toContain("author2");
+  });
+
+  test("treats all events from the same author as one unique author", () => {
+    const samePubkey = "a".repeat(64);
+    const results = [
+      makeScanResult({ pubkey: samePubkey }),
+      makeScanResult({ pubkey: samePubkey }),
+      makeScanResult({ pubkey: samePubkey }),
+    ];
+    const result = countUniqueAuthors(results);
+    expect(result.count).toBe(1);
+    expect(result.pubkeys).toEqual([samePubkey]);
+  });
+
+  test("pubkeys are case-sensitive (hex pubkeys are always lowercase)", () => {
+    // In Nostr, pubkeys are hex and should be consistent,
+    // but countUniqueAuthors should not alter them
+    const results = [
+      makeScanResult({ pubkey: "aabbcc" }),
+      makeScanResult({ pubkey: "AABBCC" }),
+    ];
+    const result = countUniqueAuthors(results);
+    expect(result.count).toBe(2);
+  });
+
+  test("handles large number of unique authors", () => {
+    const results = Array.from({ length: 100 }, (_, i) =>
+      makeScanResult({ pubkey: `author_${i.toString().padStart(3, "0")}` })
+    );
+    const result = countUniqueAuthors(results);
+    expect(result.count).toBe(100);
+    expect(result.pubkeys).toHaveLength(100);
+  });
+
+  test("handles mix of unique and duplicate authors", () => {
+    const results = [
+      makeScanResult({ pubkey: "alice" }),
+      makeScanResult({ pubkey: "bob" }),
+      makeScanResult({ pubkey: "alice" }),
+      makeScanResult({ pubkey: "charlie" }),
+      makeScanResult({ pubkey: "bob" }),
+      makeScanResult({ pubkey: "alice" }),
+      makeScanResult({ pubkey: "dave" }),
+    ];
+    const result = countUniqueAuthors(results);
+    expect(result.count).toBe(4);
+    expect(result.pubkeys).toContain("alice");
+    expect(result.pubkeys).toContain("bob");
+    expect(result.pubkeys).toContain("charlie");
+    expect(result.pubkeys).toContain("dave");
+  });
+
+  test("returns pubkeys array that is a new array (not shared reference)", () => {
+    const results = [makeScanResult({ pubkey: "author1" })];
+    const result1 = countUniqueAuthors(results);
+    const result2 = countUniqueAuthors(results);
+    expect(result1.pubkeys).not.toBe(result2.pubkeys);
+    expect(result1.pubkeys).toEqual(result2.pubkeys);
+  });
+
+  test("works with events from different relays", () => {
+    const results = [
+      makeScanResult({ pubkey: "author1" }, "wss://relay1.example.com"),
+      makeScanResult({ pubkey: "author1" }, "wss://relay2.example.com"),
+      makeScanResult({ pubkey: "author2" }, "wss://relay1.example.com"),
+    ];
+    const result = countUniqueAuthors(results);
+    expect(result.count).toBe(2);
   });
 });

@@ -325,6 +325,26 @@ export function extractReferencedEvents(event: NostrEvent): ReferencedEvent[] {
 }
 
 // ---------------------------------------------------------------------------
+// Unique author counting
+// ---------------------------------------------------------------------------
+
+/**
+ * Count unique authors (pubkeys) across scan results to measure community reach.
+ *
+ * Returns the count and the deduplicated list of pubkeys.
+ */
+export function countUniqueAuthors(results: ScanResult[]): {
+  count: number;
+  pubkeys: string[];
+} {
+  const pubkeys = new Set<string>();
+  for (const r of results) {
+    pubkeys.add(r.event.pubkey);
+  }
+  return { count: pubkeys.size, pubkeys: [...pubkeys] };
+}
+
+// ---------------------------------------------------------------------------
 // Output generation
 // ---------------------------------------------------------------------------
 
@@ -373,7 +393,7 @@ function generateMarkdownReport(results: ScanResult[], sinceDays: number): strin
   );
 
   // Stats
-  const uniquePubkeys = new Set(sorted.map((r) => r.event.pubkey));
+  const { count: uniqueAuthorCount } = countUniqueAuthors(sorted);
   const kindCounts: Record<number, number> = {};
   const matchTypeCounts: Record<string, number> = { "t-tag": 0, "p-tag": 0, "content": 0 };
 
@@ -388,7 +408,7 @@ function generateMarkdownReport(results: ScanResult[], sinceDays: number): strin
   md += `**Generated:** ${now.toISOString()}\n`;
   md += `**Period:** Last ${sinceDays} days\n`;
   md += `**Total events found:** ${sorted.length}\n`;
-  md += `**Unique authors:** ${uniquePubkeys.size}\n\n`;
+  md += `**Unique authors:** ${uniqueAuthorCount}\n\n`;
 
   md += `## Match Summary\n\n`;
   md += `| Match Type | Count |\n`;
@@ -532,7 +552,10 @@ async function main() {
 
   await Promise.all(relayPromises);
 
+  const { count: uniqueAuthors } = countUniqueAuthors(allResults);
+
   console.log(`\nTotal unique events: ${allResults.length}`);
+  console.log(`Unique authors:     ${uniqueAuthors}`);
   console.log(
     `Relays contacted: ${relayStats.length} (${relayStats.filter((r) => !r.error).length} successful)\n`
   );
@@ -569,6 +592,7 @@ async function main() {
     nostria_npub: NOSTRIA_NPUB,
     nostria_hex: NOSTRIA_HEX,
     total_events: allResults.length,
+    unique_authors: uniqueAuthors,
     relay_stats: relayStats,
     events: allResults.map((r) => ({
       id: r.event.id,
@@ -598,6 +622,7 @@ async function main() {
   // Print summary
   console.log("\n=== Scan Complete ===");
   console.log(`Events:  ${allResults.length}`);
+  console.log(`Authors: ${uniqueAuthors}`);
   console.log(`JSON:    ${jsonFilename}`);
   console.log(`Report:  ${mdFilename}`);
 }
