@@ -6,6 +6,7 @@
     "typecheck": "tsc --noEmit",
     "scan": "bun run scripts/marketing/nostr-mention-scanner.ts",
     "validate-relays": "bun run scripts/marketing/validate-relays.ts",
+    "test-relays": "bun run scripts/marketing/test-relay-connections.ts",
     "test": "bun test"
   },
   "devDependencies": {
