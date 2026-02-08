@@ -7,6 +7,7 @@
     "scan": "bun run scripts/marketing/nostr-mention-scanner.ts",
     "validate-relays": "bun run scripts/marketing/validate-relays.ts",
     "test-relays": "bun run scripts/marketing/test-relay-connections.ts",
+    "relay-health": "bun run scripts/marketing/relay-health-report.ts",
     "test": "bun test"
   },
   "devDependencies": {
