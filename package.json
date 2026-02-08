@@ -1,0 +1,14 @@
+{
+  "name": "nostria-operations",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "scan": "bun run scripts/marketing/nostr-mention-scanner.ts",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5"
+  }
+}
