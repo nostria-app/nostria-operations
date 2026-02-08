@@ -1,0 +1,22 @@
+# DevOps Agent Configuration
+
+name: devops
+description: Deployment automation, monitoring, and uptime
+schedule: "daily"  # Options: daily, weekly, on-demand
+
+# Services to monitor
+services:
+  - name: "nostria-app"
+    health_check_url: ""  # TODO: add health check endpoint
+    restart_on_failure: false
+  - name: "nostria-website"
+    health_check_url: ""  # TODO: add health check endpoint
+    restart_on_failure: false
+
+# Deployment
+auto_rollback: false  # require human approval for rollbacks
+deploy_branch: "main"
+
+# Output
+output_dir: "logs"
+output_format: "markdown"

@@ -1,0 +1,47 @@
+# GitHub Actions: Weekly Management Review
+# Runs the management agent every Monday to summarize progress and suggest tasks.
+
+name: Weekly Management Review
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'  # Every Monday at 9:00 UTC
+  workflow_dispatch:  # Allow manual trigger
+
+permissions:
+  issues: write
+  contents: write
+
+jobs:
+  weekly-review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout nostria-operations
+        uses: actions/checkout@v4
+
+      - name: Gather open issues across repos
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "# Weekly Review Context — $(date +%Y-%m-%d)" > context.md
+          echo "" >> context.md
+
+          for repo in nostria-app/nostria nostria-app/nostria-website nostria-app/nostria-operations; do
+            echo "## $repo" >> context.md
+            gh issue list --repo "$repo" --state open --limit 30 --json number,title,labels,createdAt,assignees | jq '.' >> context.md
+            echo "" >> context.md
+          done
+
+          echo "Context gathered:"
+          cat context.md
+
+      - name: Create review issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          DATE=$(date +%Y-%m-%d)
+          gh issue create \
+            --repo nostria-app/nostria-operations \
+            --title "Weekly Review — $DATE" \
+            --body "$(cat context.md)" \
+            --label "management,weekly-review"

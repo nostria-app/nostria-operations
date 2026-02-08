@@ -1,0 +1,23 @@
+# Analytics Agent Configuration
+
+name: analytics
+description: App usage monitoring, KPIs, and trend analysis
+schedule: "weekly"  # Options: daily, weekly, on-demand
+
+# Metrics to track
+kpis:
+  - user_signups
+  - daily_active_users
+  - posts_created
+  - relay_connections
+  - error_rate
+  - response_time_p95
+
+# Thresholds for alerts
+alerts:
+  error_rate_threshold: 0.05  # 5%
+  response_time_threshold_ms: 2000
+
+# Output
+output_dir: "logs"
+output_format: "markdown"

@@ -1,0 +1,22 @@
+# Management Agent Configuration
+
+name: management
+description: Planning, task prioritization, and weekly reviews
+schedule: "weekly"  # Options: daily, weekly, on-demand
+
+# Repos to monitor
+repos:
+  - nostria-app/nostria
+  - nostria-app/nostria-website
+  - nostria-app/nostria-operations
+
+# Output
+output_dir: "logs"
+output_format: "markdown"
+
+# Behavior
+max_issues_to_create: 5
+auto_label: true
+labels:
+  - "agent-generated"
+  - "management"

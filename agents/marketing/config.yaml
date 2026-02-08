@@ -1,0 +1,24 @@
+# Marketing Agent Configuration
+
+name: marketing
+description: Social media, content generation, and campaign planning
+schedule: "on-demand"  # Options: daily, weekly, on-demand
+
+# Content platforms
+platforms:
+  - nostr
+  - twitter
+  - blog  # via nostria-website
+
+# Output
+output_dir: "marketing"
+content_types:
+  - social-posts
+  - blog-drafts
+  - announcements
+  - threads
+
+# Behavior
+tone: "friendly, enthusiastic, technical but accessible"
+max_post_length: 280  # for Twitter-style posts
+auto_publish: false  # always require human review before posting
