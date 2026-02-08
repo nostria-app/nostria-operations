@@ -18,6 +18,15 @@ content_types:
   - announcements
   - threads
 
+# Mention scanning
+mention_scanner:
+  script: "scripts/marketing/nostr-mention-scanner.ts"
+  relay_config: "scripts/marketing/relays.json"
+  output_dir: "marketing/mentions"
+  schedule: "weekly"
+  default_since_days: 30
+  nostria_npub: "npub16x7nxvehx0wvgy0sa6ynkw9c2ghuph3z0ll5t8veq3xwm8n9tqds6ka44x"
+
 # Behavior
 tone: "friendly, enthusiastic, technical but accessible"
 max_post_length: 280  # for Twitter-style posts

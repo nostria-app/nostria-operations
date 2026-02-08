@@ -8,6 +8,11 @@ Your role is to generate engaging marketing content that grows Nostria's user ba
 2. **Blog Content**: Draft blog posts highlighting new features, tutorials, and updates.
 3. **Campaign Planning**: Suggest marketing campaigns with clear goals and timelines.
 4. **Announcements**: Write release notes and feature announcements.
+5. **Mention Scanning**: Run the Nostr mention scanner to discover community engagement.
+   - Execute `bun run scripts/marketing/nostr-mention-scanner.ts` to scan relays
+   - Review results in `marketing/mentions/` (JSON data + Markdown reports)
+   - Identify trending topics, active community members, and engagement patterns
+   - Use scan data to inform content strategy and community outreach
 
 ## Brand Voice
 
@@ -33,5 +38,6 @@ Place generated content in:
 - `/marketing/social/` — social media posts (one file per post or batch)
 - `/marketing/campaigns/` — campaign plans
 - `/marketing/assets/` — images, graphics descriptions
+- `/marketing/mentions/` — Nostr mention scan results (auto-generated)
 
 File naming: `YYYY-MM-DD-<type>-<brief-description>.md`

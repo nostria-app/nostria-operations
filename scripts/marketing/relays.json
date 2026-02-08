@@ -1,0 +1,21 @@
+{
+  "relays": [
+    "wss://relay.damus.io",
+    "wss://relay.nostr.band",
+    "wss://nos.lol",
+    "wss://relay.snort.social",
+    "wss://relay.primal.net",
+    "wss://nostr.wine",
+    "wss://relay.nostr.bg",
+    "wss://nostr-pub.wellorder.net",
+    "wss://offchain.pub",
+    "wss://nostr.mom",
+    "wss://relay.mostr.pub",
+    "wss://nostr.oxtr.dev",
+    "wss://relay.nostr.net",
+    "wss://relay.nos.social",
+    "wss://ribo.eu.nostria.app"
+  ],
+  "timeout_ms": 15000,
+  "description": "List of Nostr relays to scan for Nostria mentions. Add or remove relays as needed."
+}
