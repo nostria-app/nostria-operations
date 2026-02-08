@@ -25,8 +25,8 @@ function makeReport(overrides?: Partial<ConnectionTestReport>): ConnectionTestRe
     reachable: 1,
     unreachable: 1,
     results: [
-      { url: "wss://relay.example.com", reachable: true, latencyMs: 42, error: null },
-      { url: "wss://bad.example.com", reachable: false, latencyMs: null, error: "Connection failed" },
+      { url: "wss://relay.example.com", reachable: true, latencyMs: 42, error: null, retriesUsed: 0 },
+      { url: "wss://bad.example.com", reachable: false, latencyMs: null, error: "Connection failed", retriesUsed: 2 },
     ],
     configPath: "/fake/relays.json",
     timeoutMs: 5000,
@@ -54,7 +54,12 @@ describe("testRelayConnections", () => {
     expect(report).toHaveProperty("configPath");
     expect(report).toHaveProperty("timeoutMs");
     expect(report).toHaveProperty("durationMs");
-  }, 5000);
+    // Each result should have retriesUsed from the retry logic
+    for (const r of report.results) {
+      expect(r).toHaveProperty("retriesUsed");
+      expect(typeof r.retriesUsed).toBe("number");
+    }
+  }, 15000);
 
   test("configPath and timeoutMs are passed through", async () => {
     const report = await testRelayConnections([], 7500, "/my/config.json");
@@ -112,7 +117,7 @@ describe("formatLogMarkdown", () => {
 
   test("includes results table with all relays", () => {
     const md = formatLogMarkdown(makeReport());
-    expect(md).toContain("| Relay | Status | Latency | Detail |");
+    expect(md).toContain("| Relay | Status | Latency | Retries | Detail |");
     expect(md).toContain("wss://relay.example.com");
     expect(md).toContain("wss://bad.example.com");
     expect(md).toContain("| OK |");
@@ -138,8 +143,8 @@ describe("formatLogMarkdown", () => {
       unreachable: 0,
       reachable: 2,
       results: [
-        { url: "wss://a.com", reachable: true, latencyMs: 10, error: null },
-        { url: "wss://b.com", reachable: true, latencyMs: 20, error: null },
+        { url: "wss://a.com", reachable: true, latencyMs: 10, error: null, retriesUsed: 0 },
+        { url: "wss://b.com", reachable: true, latencyMs: 20, error: null, retriesUsed: 0 },
       ],
     });
     const md = formatLogMarkdown(report);

@@ -35,7 +35,15 @@ export interface RelayCheckResult {
   reachable: boolean;
   latencyMs: number | null;
   error: string | null;
+  /** Number of retry attempts before the final result (0 = succeeded on first try). */
+  retriesUsed: number;
 }
+
+/** Maximum number of retries per relay for transient connection failures. */
+export const MAX_RETRIES = 2;
+
+/** Delay in ms between retry attempts. */
+export const RETRY_DELAY_MS = 500;
 
 export interface ValidationReport {
   timestamp: string;
@@ -75,10 +83,17 @@ export function loadRelayConfig(configPath: string): RelayConfig {
 }
 
 // ---------------------------------------------------------------------------
-// Single relay connectivity check
+// Single relay connectivity check (one attempt, no retries)
 // ---------------------------------------------------------------------------
 
-export function checkRelay(url: string, timeoutMs: number): Promise<RelayCheckResult> {
+export interface SingleCheckResult {
+  url: string;
+  reachable: boolean;
+  latencyMs: number | null;
+  error: string | null;
+}
+
+function checkRelaySingle(url: string, timeoutMs: number): Promise<SingleCheckResult> {
   return new Promise((resolvePromise) => {
     const startTime = Date.now();
     let resolved = false;
@@ -170,6 +185,62 @@ export function checkRelay(url: string, timeoutMs: number): Promise<RelayCheckRe
       finish(false, err instanceof Error ? err.message : String(err));
     }
   });
+}
+
+// ---------------------------------------------------------------------------
+// Retry-aware relay connectivity check
+// ---------------------------------------------------------------------------
+
+/**
+ * Determines whether a failed check result represents a transient error
+ * that is worth retrying (timeouts, connection failures, unexpected closes).
+ */
+export function isTransientError(result: SingleCheckResult): boolean {
+  if (result.reachable) return false;
+  const err = result.error ?? "";
+  // Transient: timeouts, generic connection failures, unexpected close
+  return (
+    err.includes("Timeout") ||
+    err.includes("Connection failed") ||
+    err.includes("Failed to connect") ||
+    err.includes("Connection closed before open") ||
+    err.includes("ECONNREFUSED") ||
+    err.includes("ECONNRESET") ||
+    err.includes("ETIMEDOUT") ||
+    err.includes("EAI_AGAIN")
+  );
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+/**
+ * Checks a relay with automatic retries for transient failures.
+ * Retries up to MAX_RETRIES times (default 2) before returning the final result.
+ */
+export async function checkRelay(
+  url: string,
+  timeoutMs: number,
+  maxRetries: number = MAX_RETRIES,
+  retryDelayMs: number = RETRY_DELAY_MS
+): Promise<RelayCheckResult> {
+  let lastResult: SingleCheckResult | null = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    if (attempt > 0) {
+      await delay(retryDelayMs);
+    }
+
+    lastResult = await checkRelaySingle(url, timeoutMs);
+
+    if (lastResult.reachable || !isTransientError(lastResult)) {
+      return { ...lastResult, retriesUsed: attempt };
+    }
+  }
+
+  // All retries exhausted — return the last failure
+  return { ...lastResult!, retriesUsed: maxRetries };
 }
 
 // ---------------------------------------------------------------------------

@@ -87,15 +87,16 @@ export function formatLogMarkdown(report: ConnectionTestReport): string {
     "",
     "## Results",
     "",
-    `| Relay | Status | Latency | Detail |`,
-    `|-------|--------|---------|--------|`,
+    `| Relay | Status | Latency | Retries | Detail |`,
+    `|-------|--------|---------|---------|--------|`,
   ];
 
   for (const r of report.results) {
     const status = r.reachable ? "OK" : "FAIL";
     const latency = r.latencyMs !== null ? `${r.latencyMs}ms` : "—";
+    const retries = r.retriesUsed > 0 ? String(r.retriesUsed) : "0";
     const detail = r.error ?? "—";
-    lines.push(`| ${r.url} | ${status} | ${latency} | ${detail} |`);
+    lines.push(`| ${r.url} | ${status} | ${latency} | ${retries} | ${detail} |`);
   }
 
   lines.push(

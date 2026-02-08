@@ -7,8 +7,12 @@ import {
   checkRelay,
   validateRelays,
   getDefaultConfigPath,
+  isTransientError,
+  MAX_RETRIES,
+  RETRY_DELAY_MS,
   type RelayConfig,
   type RelayCheckResult,
+  type SingleCheckResult,
   type ValidationReport,
 } from "./validate-relays";
 
@@ -137,7 +141,7 @@ describe("loadRelayConfig", () => {
 
 describe("checkRelay", () => {
   test("returns failure for unreachable host", async () => {
-    const result = await checkRelay("wss://localhost:19999", 2000);
+    const result = await checkRelay("wss://localhost:19999", 2000, 0);
     expect(result.url).toBe("wss://localhost:19999");
     expect(result.reachable).toBe(false);
     expect(result.latencyMs).toBeNull();
@@ -146,17 +150,24 @@ describe("checkRelay", () => {
 
   test("returns failure on timeout for non-responding host", async () => {
     // Use a very short timeout to force a timeout scenario
-    const result = await checkRelay("wss://192.0.2.1:443", 500);
+    const result = await checkRelay("wss://192.0.2.1:443", 500, 0);
     expect(result.reachable).toBe(false);
     expect(result.error).toBeTruthy();
   }, 5000);
 
-  test("result has correct shape", async () => {
-    const result = await checkRelay("wss://localhost:19999", 1000);
+  test("result has correct shape including retriesUsed", async () => {
+    const result = await checkRelay("wss://localhost:19999", 1000, 0);
     expect(result).toHaveProperty("url");
     expect(result).toHaveProperty("reachable");
     expect(result).toHaveProperty("latencyMs");
     expect(result).toHaveProperty("error");
+    expect(result).toHaveProperty("retriesUsed");
+    expect(typeof result.retriesUsed).toBe("number");
+  }, 5000);
+
+  test("retriesUsed is 0 when maxRetries is 0", async () => {
+    const result = await checkRelay("wss://localhost:19999", 1000, 0);
+    expect(result.retriesUsed).toBe(0);
   }, 5000);
 });
 
@@ -262,4 +273,164 @@ describe("getDefaultConfigPath", () => {
     const configPath = getDefaultConfigPath();
     expect(configPath).toMatch(/relays\.json$/);
   });
+});
+
+// ---------------------------------------------------------------------------
+// isTransientError unit tests
+// ---------------------------------------------------------------------------
+
+describe("isTransientError", () => {
+  test("returns true for timeout errors", () => {
+    const result: SingleCheckResult = {
+      url: "wss://test.com",
+      reachable: false,
+      latencyMs: null,
+      error: "Timeout after 5000ms",
+    };
+    expect(isTransientError(result)).toBe(true);
+  });
+
+  test("returns true for connection failed errors", () => {
+    const result: SingleCheckResult = {
+      url: "wss://test.com",
+      reachable: false,
+      latencyMs: null,
+      error: "Connection failed",
+    };
+    expect(isTransientError(result)).toBe(true);
+  });
+
+  test("returns true for connection closed before open", () => {
+    const result: SingleCheckResult = {
+      url: "wss://test.com",
+      reachable: false,
+      latencyMs: null,
+      error: "Connection closed before open (code: 1006)",
+    };
+    expect(isTransientError(result)).toBe(true);
+  });
+
+  test("returns true for ECONNREFUSED", () => {
+    const result: SingleCheckResult = {
+      url: "wss://test.com",
+      reachable: false,
+      latencyMs: null,
+      error: "ECONNREFUSED",
+    };
+    expect(isTransientError(result)).toBe(true);
+  });
+
+  test("returns true for ECONNRESET", () => {
+    const result: SingleCheckResult = {
+      url: "wss://test.com",
+      reachable: false,
+      latencyMs: null,
+      error: "ECONNRESET",
+    };
+    expect(isTransientError(result)).toBe(true);
+  });
+
+  test("returns true for ETIMEDOUT", () => {
+    const result: SingleCheckResult = {
+      url: "wss://test.com",
+      reachable: false,
+      latencyMs: null,
+      error: "ETIMEDOUT",
+    };
+    expect(isTransientError(result)).toBe(true);
+  });
+
+  test("returns true for EAI_AGAIN", () => {
+    const result: SingleCheckResult = {
+      url: "wss://test.com",
+      reachable: false,
+      latencyMs: null,
+      error: "EAI_AGAIN",
+    };
+    expect(isTransientError(result)).toBe(true);
+  });
+
+  test("returns true for Failed to connect (Bun WebSocket)", () => {
+    const result: SingleCheckResult = {
+      url: "wss://test.com",
+      reachable: false,
+      latencyMs: null,
+      error: "WebSocket connection to 'wss://test.com/' failed: Failed to connect",
+    };
+    expect(isTransientError(result)).toBe(true);
+  });
+
+  test("returns false for reachable results", () => {
+    const result: SingleCheckResult = {
+      url: "wss://test.com",
+      reachable: true,
+      latencyMs: 42,
+      error: null,
+    };
+    expect(isTransientError(result)).toBe(false);
+  });
+
+  test("returns false for non-transient errors", () => {
+    const result: SingleCheckResult = {
+      url: "wss://test.com",
+      reachable: false,
+      latencyMs: null,
+      error: "Failed to send REQ",
+    };
+    expect(isTransientError(result)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Retry logic unit tests
+// ---------------------------------------------------------------------------
+
+describe("retry logic", () => {
+  test("MAX_RETRIES is 2", () => {
+    expect(MAX_RETRIES).toBe(2);
+  });
+
+  test("RETRY_DELAY_MS is a positive number", () => {
+    expect(RETRY_DELAY_MS).toBeGreaterThan(0);
+  });
+
+  test("retriesUsed is reported in result for unreachable host", async () => {
+    // With retries disabled (0), should be 0
+    const result = await checkRelay("wss://localhost:19999", 500, 0);
+    expect(result.retriesUsed).toBe(0);
+    expect(result.reachable).toBe(false);
+  }, 5000);
+
+  test("retries transient failures up to maxRetries", async () => {
+    // Use maxRetries=1 with a short timeout to keep test fast
+    const result = await checkRelay("wss://localhost:19999", 300, 1, 50);
+    expect(result.reachable).toBe(false);
+    // Should have used 1 retry (transient connection failure)
+    expect(result.retriesUsed).toBe(1);
+  }, 10000);
+
+  test("retries transient failures up to maxRetries=2", async () => {
+    // Use maxRetries=2 with a short timeout
+    const result = await checkRelay("wss://localhost:19999", 300, 2, 50);
+    expect(result.reachable).toBe(false);
+    // Should have used all 2 retries (transient connection failure)
+    expect(result.retriesUsed).toBe(2);
+  }, 10000);
+
+  test("does not retry more than maxRetries times", async () => {
+    const startTime = Date.now();
+    const result = await checkRelay("wss://localhost:19999", 200, 2, 50);
+    const elapsed = Date.now() - startTime;
+    expect(result.reachable).toBe(false);
+    expect(result.retriesUsed).toBe(2);
+    // With 3 attempts (1 + 2 retries) of 200ms timeout each + 2 delays of 50ms,
+    // it should take roughly 700ms minimum. Give a generous upper bound.
+    expect(elapsed).toBeGreaterThanOrEqual(100);
+  }, 10000);
+
+  test("validateRelays results include retriesUsed field", async () => {
+    const report = await validateRelays(["wss://localhost:19999"], 300);
+    expect(report.results[0]).toHaveProperty("retriesUsed");
+    expect(typeof report.results[0].retriesUsed).toBe("number");
+  }, 10000);
 });
