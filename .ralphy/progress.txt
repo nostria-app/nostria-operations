@@ -1,2 +1,9 @@
 # Ralphy Progress Log
 
+- [✓] 2026-02-08 20:39 - Verify Bun is installed and available on PATH (`bun --version`)
+- [✓] 2026-02-08 20:43 - Create `tsconfig.json` with strict mode for the scripts directory
+- [✓] 2026-02-08 20:48 - Validate that `scripts/marketing/relays.json` contains reachable relays (connect test)
+- [✓] 2026-02-08 20:53 - Test WebSocket connections to every relay in `relays.json` and log results
+- [✓] 2026-02-08 20:59 - Add retry logic for transient relay connection failures (max 2 retries per relay)
+- [✓] 2026-02-08 21:06 - Add relay health reporting: track which relays responded, timed out, or errored
+- [✓] 2026-02-08 21:13 - Handle relay `NOTICE` messages and log them for debugging

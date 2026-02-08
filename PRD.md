@@ -14,16 +14,16 @@ data to the repo, and generates human-readable reports for the marketing agent.
 
 ## Project Setup
 
-- [ ] Verify Bun is installed and available on PATH (`bun --version`)
-- [ ] Create `tsconfig.json` with strict mode for the scripts directory
-- [ ] Validate that `scripts/marketing/relays.json` contains reachable relays (connect test)
+- [x] Verify Bun is installed and available on PATH (`bun --version`)
+- [x] Create `tsconfig.json` with strict mode for the scripts directory
+- [x] Validate that `scripts/marketing/relays.json` contains reachable relays (connect test)
 
 ## Core Scanner — Relay Connectivity
 
-- [ ] Test WebSocket connections to every relay in `relays.json` and log results
-- [ ] Add retry logic for transient relay connection failures (max 2 retries per relay)
-- [ ] Add relay health reporting: track which relays responded, timed out, or errored
-- [ ] Handle relay `NOTICE` messages and log them for debugging
+- [x] Test WebSocket connections to every relay in `relays.json` and log results
+- [x] Add retry logic for transient relay connection failures (max 2 retries per relay)
+- [x] Add relay health reporting: track which relays responded, timed out, or errored
+- [x] Handle relay `NOTICE` messages and log them for debugging
 
 ## Core Scanner — Event Retrieval
 
