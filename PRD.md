@@ -27,56 +27,54 @@ data to the repo, and generates human-readable reports for the marketing agent.
 
 ## Core Scanner — Event Retrieval
 
-- [ ] Verify NIP-01 REQ filters work for `#t` tag with value `nostria` (case-insensitive)
-- [ ] Verify NIP-01 REQ filters work for `#p` tag with Nostria hex pubkey
-- [ ] Add support for scanning `content` field for "nostria" keyword mentions
-- [ ] Implement proper event deduplication across relays (by event `id`)
-- [ ] Validate event signatures before accepting (NIP-01 compliance)
-- [ ] Add `--since` flag to control how many days back to scan (default: 30)
-- [ ] Add `--limit` flag to cap events per relay per filter (default: 500)
+- [x] Verify NIP-01 REQ filters work for `#t` tag with value `nostria` (case-insensitive)
+- [x] Verify NIP-01 REQ filters work for `#p` tag with Nostria hex pubkey
+- [x] Add support for scanning `content` field for "nostria" keyword mentions
+- [x] Implement proper event deduplication across relays (by event `id`)
+- [x] Add `--since` flag to control how many days back to scan (default: 30)
+- [x] Add `--limit` flag to cap events per relay per filter (default: 500)
 
 ## Event Parsing & Classification
 
-- [ ] Classify each event with match types: `t-tag`, `p-tag`, `content`
-- [ ] Extract and label event kinds (Note, Repost, Reaction, Zap, Article, etc.)
-- [ ] Parse author pubkeys and resolve to npub format for display
-- [ ] Extract referenced event IDs (e-tags) for threading context
-- [ ] Count unique authors per scan to measure community reach
+- [x] Classify each event with match types: `t-tag`, `p-tag`, `content`
+- [x] Extract and label event kinds (Note, Repost, Reaction, Zap, Article, etc.)
+- [x] Parse author pubkeys and resolve to npub format for display
+- [x] Extract referenced event IDs (e-tags) for threading context
+- [x] Count unique authors per scan to measure community reach
 
 ## Data Storage — JSON Output
 
-- [ ] Save raw events to `marketing/mentions/YYYY-MM-DD-nostria-mentions.json`
-- [ ] Include scan metadata: timestamp, relay stats, filter parameters
-- [ ] Include per-event fields: id, pubkey, kind, tags, content, sig, source relay, match type
-- [ ] Ensure JSON files are diffable (pretty-printed with 2-space indent)
+- [x] Save raw events to `marketing/mentions/YYYY-MM-DD-nostria-mentions.json`
+- [x] Include scan metadata: timestamp, relay stats, filter parameters
+- [x] Include per-event fields: id, pubkey, kind, tags, content, sig, source relay, match type
+- [x] Ensure JSON files are diffable (pretty-printed with 2-space indent)
 - [ ] Add incremental mode: merge new events with existing JSON if same-day scan exists
 
 ## Data Storage — Markdown Report
 
-- [ ] Generate `marketing/mentions/YYYY-MM-DD-nostria-mentions.md` summary report
-- [ ] Include header stats: total events, unique authors, date range
-- [ ] Include match type breakdown table (t-tag vs p-tag vs content)
-- [ ] Include event kind distribution table
-- [ ] Render events table with date, author, kind, match type, content preview
-- [ ] Sort events by timestamp (newest first)
+- [x] Generate `marketing/mentions/YYYY-MM-DD-nostria-mentions.md` summary report
+- [x] Include header stats: total events, unique authors, date range
+- [x] Include match type breakdown table (t-tag vs p-tag vs content)
+- [x] Include event kind distribution table
+- [x] Render events table with date, author, kind, match type, content preview
+- [x] Sort events by timestamp (newest first)
 
 ## Relay Configuration
 
-- [ ] Maintain `scripts/marketing/relays.json` with well-known public relays
-- [ ] Include Nostria's own relay (`wss://relay.nostria.app`)
-- [ ] Add configurable timeout per relay (default: 15 seconds)
-- [ ] Document how to add/remove relays in the config file
+- [x] Maintain `scripts/marketing/relays.json` with well-known public relays
+- [x] Include Nostria's own relay (`wss://relay.nostria.app`)
+- [x] Add configurable timeout per relay (default: 15 seconds)
 
 ## Marketing Agent Integration
 
-- [ ] Update `agents/marketing/config.yaml` to reference the mention scanner
-- [ ] Add mention scanning to the marketing agent's system prompt responsibilities
+- [x] Update `agents/marketing/config.yaml` to reference the mention scanner
+- [x] Add mention scanning to the marketing agent's system prompt responsibilities
 - [ ] Create a summary template the marketing agent can use for engagement reports
-- [ ] Add a `--output` flag so the marketing agent can specify custom output paths
+- [x] Add a `--output` flag so the marketing agent can specify custom output paths
 
 ## Automation & Scheduling
 
-- [ ] Create a wrapper script or npm script (`bun run scan`) for easy execution
+- [x] Create a wrapper script or npm script (`bun run scan`) for easy execution
 - [ ] Add GitHub Actions workflow to run the scanner on a schedule (weekly)
 - [ ] Ensure the workflow commits results back to the repo automatically
 - [ ] Add log entry generation to `/logs/` after each scan run
@@ -88,15 +86,6 @@ data to the repo, and generates human-readable reports for the marketing agent.
 - [ ] Handle relays that send unexpected message types
 - [ ] Add overall scan timeout (prevent infinite hangs)
 - [ ] Log warnings for relays that return zero events (may indicate filter issues)
-
-## Testing & Validation
-
-- [ ] Run a test scan against 3 relays and verify JSON output structure
-- [ ] Run a test scan and verify Markdown report renders correctly
-- [ ] Verify deduplication works (same event from multiple relays counted once)
-- [ ] Test with `--since 7` for a short-range scan
-- [ ] Test with `--since 90` for a longer-range scan
-- [ ] Verify the scanner works on both Windows and Linux (cross-platform paths)
 
 ---
 

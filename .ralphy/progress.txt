@@ -7,3 +7,6 @@
 - [✓] 2026-02-08 20:59 - Add retry logic for transient relay connection failures (max 2 retries per relay)
 - [✓] 2026-02-08 21:06 - Add relay health reporting: track which relays responded, timed out, or errored
 - [✓] 2026-02-08 21:13 - Handle relay `NOTICE` messages and log them for debugging
+- [✓] 2026-02-08 21:21 - Verify NIP-01 REQ filters work for `#t` tag with value `nostria` (case-insensitive)
+- [✓] 2026-02-08 23:17 - Extract referenced event IDs (e-tags) for threading context
+- [✓] 2026-02-08 23:23 - Count unique authors per scan to measure community reach
